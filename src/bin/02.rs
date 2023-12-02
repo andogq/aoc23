@@ -1,7 +1,9 @@
 advent_of_code::solution!(2);
 
+#[derive(Clone, Copy)]
+#[repr(u8)]
 enum Color {
-    Red,
+    Red = 0,
     Green,
     Blue,
 }
@@ -77,17 +79,15 @@ pub fn part_two(input: &str) -> Option<u32> {
             .lines()
             .flat_map(|line| line.split_once(": "))
             .map(|line| {
-                let (red, green, blue) = line
-                    .1
+                line.1
                     .split("; ")
                     .flat_map(|pull| pull.split(", ").flat_map(Pull::try_from))
-                    .fold((0, 0, 0), |(red, green, blue), pull| match pull.color {
-                        Color::Red => (red.max(pull.amount), green, blue),
-                        Color::Green => (red, green.max(pull.amount), blue),
-                        Color::Blue => (red, green, blue.max(pull.amount)),
-                    });
-
-                red * green * blue
+                    .fold([0, 0, 0], |mut counts, pull| {
+                        counts[pull.color as usize] = counts[pull.color as usize].max(pull.amount);
+                        counts
+                    })
+                    .into_iter()
+                    .product::<u32>()
             })
             .sum(),
     )
