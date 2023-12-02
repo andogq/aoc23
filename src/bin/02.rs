@@ -1,35 +1,71 @@
 advent_of_code::solution!(2);
 
+enum Color {
+    Red,
+    Green,
+    Blue,
+}
+
+impl Color {
+    fn valid_amount(&self, amount: u32) -> bool {
+        match self {
+            Self::Red if amount <= 12 => true,
+            Self::Green if amount <= 13 => true,
+            Self::Blue if amount <= 14 => true,
+            _ => false,
+        }
+    }
+}
+
+impl TryFrom<&str> for Color {
+    type Error = ();
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "red" => Ok(Self::Red),
+            "green" => Ok(Self::Green),
+            "blue" => Ok(Self::Blue),
+            _ => Err(()),
+        }
+    }
+}
+
+struct Pull {
+    pub color: Color,
+    pub amount: u32,
+}
+
+impl TryFrom<&str> for Pull {
+    type Error = ();
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        value
+            .split_once(" ")
+            .and_then(|(amount, color)| {
+                Some(Self {
+                    amount: amount.parse::<u32>().ok()?,
+                    color: Color::try_from(color).ok()?,
+                })
+            })
+            .ok_or(())
+    }
+}
+
 pub fn part_one(input: &str) -> Option<u32> {
     Some(
         input
             .lines()
+            .flat_map(|line| line.split_once(": "))
             .flat_map(|line| {
-                let line = line.split_once(": ").unwrap();
-                let game_id = line.0.split_once(" ").unwrap().1.parse::<u32>().unwrap();
-
-                let valid = line.1.split("; ").all(|pull| {
-                    pull.split(", ").all(|collection| {
-                        collection
-                            .split_once(" ")
-                            .and_then(|(amount, color)| {
-                                amount.parse::<u32>().ok().map(|amount| (amount, color))
-                            })
-                            .map(|(amount, color)| match (color, amount) {
-                                ("red", amount) if amount <= 12 => true,
-                                ("green", amount) if amount <= 13 => true,
-                                ("blue", amount) if amount <= 14 => true,
-                                _ => false,
-                            })
-                            .unwrap()
+                line.1
+                    .split("; ")
+                    .all(|pull| {
+                        pull.split(", ")
+                            .flat_map(Pull::try_from)
+                            .all(|pull| pull.color.valid_amount(pull.amount))
                     })
-                });
-
-                if valid {
-                    Some(game_id)
-                } else {
-                    None
-                }
+                    // Parse and return game ID
+                    .then_some(line.0.split_once(" ")?.1.parse::<u32>().ok()?)
             })
             .sum(),
     )
@@ -39,28 +75,17 @@ pub fn part_two(input: &str) -> Option<u32> {
     Some(
         input
             .lines()
+            .flat_map(|line| line.split_once(": "))
             .map(|line| {
-                let line = line.split_once(": ").unwrap();
-
                 let (red, green, blue) = line
                     .1
                     .split("; ")
-                    .flat_map(|pull| {
-                        pull.split(", ").flat_map(|collection| {
-                            collection.split_once(" ").and_then(|(amount, color)| {
-                                amount.parse::<u32>().ok().map(|amount| (amount, color))
-                            })
-                        })
-                    })
-                    .fold(
-                        (0, 0, 0),
-                        |(red, green, blue), (amount, color)| match color {
-                            "red" => (red.max(amount), green, blue),
-                            "green" => (red, green.max(amount), blue),
-                            "blue" => (red, green, blue.max(amount)),
-                            _ => (red, green, blue),
-                        },
-                    );
+                    .flat_map(|pull| pull.split(", ").flat_map(Pull::try_from))
+                    .fold((0, 0, 0), |(red, green, blue), pull| match pull.color {
+                        Color::Red => (red.max(pull.amount), green, blue),
+                        Color::Green => (red, green.max(pull.amount), blue),
+                        Color::Blue => (red, green, blue.max(pull.amount)),
+                    });
 
                 red * green * blue
             })
