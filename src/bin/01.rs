@@ -78,8 +78,7 @@ pub fn part_two(input: &str) -> Option<u32> {
                                 digit_value
                             })
                         }
-                        (Some((_, value)), None) => Some(value),
-                        (None, Some((_, value))) => Some(value),
+                        (Some((_, value)), None) | (None, Some((_, value))) => Some(value),
                         (None, None) => None,
                     }
                 })
