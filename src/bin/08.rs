@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 advent_of_code::solution!(8);
 
@@ -55,41 +55,53 @@ impl TryFrom<char> for Direction {
     }
 }
 
-pub fn part_one(input: &str) -> Option<u32> {
+fn parse(
+    input: &str,
+) -> (
+    Vec<Direction>,
+    HashMap<NodeIdentifier, (NodeIdentifier, NodeIdentifier)>,
+) {
     let (directions, nodes) = input.split_once("\n\n").expect("break in input");
 
-    let directions = directions
-        .chars()
-        .map(Direction::try_from)
-        .collect::<Result<Vec<_>, _>>()
-        .expect("valid direction");
+    (
+        directions
+            .chars()
+            .map(Direction::try_from)
+            .collect::<Result<Vec<_>, _>>()
+            .expect("valid direction"),
+        nodes
+            .lines()
+            .map(|line| line.split_once(" = ").expect("valid formed node"))
+            .map(|(tag, connections)| {
+                (
+                    NodeIdentifier::try_from(tag).expect("valid node identifier"),
+                    {
+                        let (left, right) = connections[1..connections.len() - 1]
+                            .split_once(", ")
+                            .expect("node pairs seperated by comma");
 
-    let nodes = nodes
-        .lines()
-        .map(|line| line.split_once(" = ").expect("valid formed node"))
-        .map(|(tag, connections)| {
-            (
-                NodeIdentifier::try_from(tag).expect("valid node identifier"),
-                {
-                    let (left, right) = connections[1..connections.len() - 1]
-                        .split_once(", ")
-                        .expect("node pairs seperated by comma");
+                        (
+                            NodeIdentifier::try_from(left).expect("left identifier valid"),
+                            NodeIdentifier::try_from(right).expect("right identifier valid"),
+                        )
+                    },
+                )
+            })
+            .collect::<HashMap<NodeIdentifier, (NodeIdentifier, NodeIdentifier)>>(),
+    )
+}
 
-                    (
-                        NodeIdentifier::try_from(left).expect("left identifier valid"),
-                        NodeIdentifier::try_from(right).expect("right identifier valid"),
-                    )
-                },
-            )
-        })
-        .collect::<HashMap<NodeIdentifier, (NodeIdentifier, NodeIdentifier)>>();
-
-    let mut position = NodeIdentifier::start();
+fn run(
+    start: NodeIdentifier,
+    end_test: fn(&NodeIdentifier) -> bool,
+    directions: &[Direction],
+    nodes: &HashMap<NodeIdentifier, (NodeIdentifier, NodeIdentifier)>,
+) -> u32 {
+    let mut position = start;
     let mut step_count = 0;
-
     let mut directions = directions.into_iter().cycle();
 
-    while !position.is_end() {
+    while !end_test(&position) {
         let node = nodes.get(&position).expect("node present in nodes list");
 
         position = match directions.next().expect("next direction") {
@@ -100,62 +112,29 @@ pub fn part_one(input: &str) -> Option<u32> {
         step_count += 1;
     }
 
-    Some(step_count)
+    step_count
+}
+
+pub fn part_one(input: &str) -> Option<u32> {
+    let (directions, nodes) = parse(input);
+
+    Some(run(
+        NodeIdentifier::start(),
+        NodeIdentifier::is_end,
+        &directions,
+        &nodes,
+    ))
 }
 
 pub fn part_two(input: &str) -> Option<u64> {
-    let (directions, nodes) = input.split_once("\n\n").expect("break in input");
-
-    let directions = directions
-        .chars()
-        .map(Direction::try_from)
-        .collect::<Result<Vec<_>, _>>()
-        .expect("valid direction");
-
-    let nodes = nodes
-        .lines()
-        .map(|line| line.split_once(" = ").expect("valid formed node"))
-        .map(|(tag, connections)| {
-            (
-                NodeIdentifier::try_from(tag).expect("valid node identifier"),
-                {
-                    let (left, right) = connections[1..connections.len() - 1]
-                        .split_once(", ")
-                        .expect("node pairs seperated by comma");
-
-                    (
-                        NodeIdentifier::try_from(left).expect("left identifier valid"),
-                        NodeIdentifier::try_from(right).expect("right identifier valid"),
-                    )
-                },
-            )
-        })
-        .collect::<HashMap<NodeIdentifier, (NodeIdentifier, NodeIdentifier)>>();
+    let (directions, nodes) = parse(input);
 
     Some(
         nodes
             .keys()
             .cloned()
             .filter(NodeIdentifier::is_ghost_start)
-            .map(|mut position| {
-                // Run node until completion
-                let mut step_count = 0u64;
-
-                let mut directions = directions.iter().cycle();
-
-                while !position.is_ghost_end() {
-                    let node = nodes.get(&position).expect("node present in nodes list");
-
-                    position = match directions.next().expect("next direction") {
-                        Direction::Left => node.0,
-                        Direction::Right => node.1,
-                    };
-
-                    step_count += 1;
-                }
-
-                step_count
-            })
+            .map(|position| run(position, NodeIdentifier::is_ghost_end, &directions, &nodes) as u64)
             .fold(1u64, num::integer::lcm),
     )
 }
