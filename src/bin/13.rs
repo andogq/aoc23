@@ -1,7 +1,32 @@
 advent_of_code::solution!(13);
 
-pub fn part_one(input: &str) -> Option<u32> {
-    let input = input
+fn find_reflection(
+    col_max: usize,
+    row_max: usize,
+    variance: usize,
+    get: impl Fn(usize, usize) -> bool,
+) -> Option<usize> {
+    (1..row_max).find(|&row| {
+        let distance = if row <= row_max / 2 {
+            row
+        } else {
+            row_max - row
+        };
+
+        (0..distance)
+            .into_iter()
+            .map(|d| {
+                (0..col_max)
+                    .filter(|&col| get(col, row + d) != get(col, row - d - 1))
+                    .count()
+            })
+            .sum::<usize>()
+            == variance
+    })
+}
+
+fn solve(input: &str, variance: usize) -> u32 {
+    input
         .split("\n\n")
         .map(|section| {
             section
@@ -17,158 +42,30 @@ pub fn part_one(input: &str) -> Option<u32> {
                 })
                 .collect::<Vec<_>>()
         })
-        .collect::<Vec<_>>();
-
-    let mut score = 0;
-
-    for section in input {
-        let mut found_reflection = false;
-
-        for x in 1..(section[0].len()) {
-            let distance = if x <= section[0].len() / 2 {
-                x
-            } else {
-                section[0].len() - x
-            };
-
-            // dbg!(x, distance);
-
-            let reflected = (0..distance).into_iter().all(|d| {
-                section.iter().all(|line| {
-                    dbg!(x, d);
-                    let line_a = line[x - d - 1];
-                    let line_b = line[x + d];
-
-                    line_a == line_b
-                })
-            });
-
-            if reflected {
-                println!("vertical reflection at x = {x}");
-                score += x as u32;
-                found_reflection = true;
-                break;
+        .map(|section| {
+            if let Some(x) = find_reflection(section.len(), section[0].len(), variance, |y, x| {
+                section[y][x]
+            }) {
+                return x as u32;
             }
-        }
 
-        if found_reflection {
-            continue;
-        }
-
-        for y in 1..(section.len()) {
-            let distance = if y < section.len() / 2 {
-                y
-            } else {
-                section.len() - y
-            };
-
-            // dbg!(y, distance);
-
-            let reflected = (0..distance)
-                .into_iter()
-                .all(|d| (0..section[y].len()).all(|x| section[y + d][x] == section[y - d - 1][x]));
-
-            if reflected {
-                println!("horizontal reflection at y = {y}");
-                score += y as u32 * 100;
-                break;
+            if let Some(y) = find_reflection(section[0].len(), section.len(), variance, |x, y| {
+                section[y][x]
+            }) {
+                return y as u32 * 100;
             }
-        }
-    }
 
-    Some(score)
+            unreachable!("reflection expected in every input")
+        })
+        .sum()
+}
+
+pub fn part_one(input: &str) -> Option<u32> {
+    Some(solve(input, 0))
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
-    let input = input
-        .split("\n\n")
-        .map(|section| {
-            section
-                .lines()
-                .map(|line| {
-                    line.chars()
-                        .map(|c| match c {
-                            '#' => true,
-                            '.' => false,
-                            _ => unreachable!("invalid character in input"),
-                        })
-                        .collect::<Vec<_>>()
-                })
-                .collect::<Vec<_>>()
-        })
-        .collect::<Vec<_>>();
-
-    let mut score = 0;
-
-    for section in input {
-        let mut found_reflection = false;
-
-        for x in 1..(section[0].len()) {
-            let distance = if x <= section[0].len() / 2 {
-                x
-            } else {
-                section[0].len() - x
-            };
-
-            // dbg!(x, distance);
-
-            let reflected = (0..distance)
-                .into_iter()
-                .map(|d| {
-                    section
-                        .iter()
-                        .filter(|line| {
-                            dbg!(x, d);
-                            let line_a = line[x - d - 1];
-                            let line_b = line[x + d];
-
-                            line_a != line_b
-                        })
-                        .count()
-                })
-                .sum::<usize>()
-                == 1;
-
-            if reflected {
-                println!("vertical reflection at x = {x}");
-                score += x as u32;
-                found_reflection = true;
-                break;
-            }
-        }
-
-        if found_reflection {
-            continue;
-        }
-
-        for y in 1..(section.len()) {
-            let distance = if y <= section.len() / 2 {
-                y
-            } else {
-                section.len() - y
-            };
-
-            // dbg!(y, distance);
-
-            let reflected = (0..distance)
-                .into_iter()
-                .map(|d| {
-                    (0..section[y].len())
-                        .filter(|&x| section[y + d][x] != section[y - d - 1][x])
-                        .count()
-                })
-                .sum::<usize>()
-                == 1;
-
-            if reflected {
-                println!("horizontal reflection at y = {y}");
-                score += y as u32 * 100;
-                break;
-            }
-        }
-    }
-
-    Some(score)
+    Some(solve(input, 1))
 }
 
 #[cfg(test)]
