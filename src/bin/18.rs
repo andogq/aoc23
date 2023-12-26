@@ -49,167 +49,12 @@ impl TryFrom<u32> for Direction {
     }
 }
 
-pub fn part_one(input: &str) -> Option<u32> {
-    let corners = input
-        .lines()
-        .map(|line| {
-            let mut iter = line.split_whitespace();
-
-            let direction =
-                Direction::try_from(iter.next().expect("direction").chars().next().unwrap())
-                    .unwrap();
-            let distance = iter
-                .next()
-                .expect("distance")
-                .parse::<u32>()
-                .expect("valid distance");
-
-            (direction, distance)
-        })
-        .scan((0isize, 0isize), |(x, y), (direction, distance)| {
-            let (dx, dy) = direction.into();
-
-            let result = Some(((*x, *y), direction, distance));
-
-            *x += dx * distance as isize;
-            *y += dy * distance as isize;
-
-            result
-        })
-        .collect::<Vec<_>>();
-
-    // Find min bounds
-    let (min_x, min_y) = corners
-        .iter()
-        .fold((0, 0), |(min_x, min_y), ((x, y), _, _)| {
-            ((*x).min(min_x), (*y).min(min_y))
-        });
-
-    // Offset everything to make min (0, 0)
-    let corners = corners
-        .into_iter()
-        .map(|((x, y), direction, distance)| {
-            (
-                ((x - min_x) as usize, (y - min_y) as usize),
-                direction,
-                distance,
-            )
-        })
-        .collect::<Vec<_>>();
-
-    // Find max bounds
-    let (max_x, max_y) = corners
-        .iter()
-        .fold((0, 0), |(max_x, max_y), ((x, y), _, _)| {
-            ((*x).max(max_x), (*y).max(max_y))
-        });
-
-    let mut map = vec![vec![false; max_x + 1]; max_y + 1];
-
-    // Trace out map
-    for ((x, y), direction, distance) in &corners {
-        for i in 1..=*distance {
-            let (dx, dy) = (*direction).into();
-
-            let x = x.checked_add_signed(dx * i as isize).unwrap();
-            let y = y.checked_add_signed(dy * i as isize).unwrap();
-
-            map[y][x] = true;
-        }
-    }
-
-    let mut count = 0;
-    let mut previous_row = Vec::new();
-
-    for row in map.iter() {
-        let mut inside = false;
-        let mut line_entry = None;
-
-        let mut new_row = Vec::new();
-
-        for (x, cell) in row.iter().enumerate() {
-            let mut filled = false;
-
-            if *cell {
-                // Line
-                filled = true;
-
-                let previous_empty = x
-                    .checked_add_signed(-1)
-                    .and_then(|x| row.get(x))
-                    .map(|cell| !cell)
-                    .unwrap_or(true);
-                let next_empty = row.get(x + 1).map(|cell| !cell).unwrap_or(true);
-
-                let is_corner = (previous_empty || next_empty) && !(previous_empty && next_empty);
-
-                if is_corner {
-                    let corner_type = previous_row.get(x).cloned().unwrap_or_default();
-
-                    if let Some(entry) = line_entry {
-                        if corner_type != entry {
-                            // Corners pointing in opposite directions
-                            inside = !inside;
-                        }
-
-                        line_entry = None;
-                    } else {
-                        line_entry = Some(corner_type);
-                    }
-                } else if line_entry.is_none() {
-                    inside = !inside;
-                }
-            } else {
-                // Empty
-                if inside {
-                    filled = true;
-                }
-
-                line_entry = None;
-            }
-
-            new_row.push(*cell);
-            if filled {
-                count += 1;
-            }
-
-            print!("{}", if filled { "#" } else { "." });
-        }
-
-        previous_row = new_row;
-        println!("");
-    }
-
-    Some(count)
-}
-
-pub fn part_two(input: &str) -> Option<u128> {
+fn solve(corners: impl Iterator<Item = (Direction, u128)>) -> u128 {
     let mut min_x = 0;
     let mut max_x = 0;
 
     let corners = {
-        let mut corners = input
-            .lines()
-            .map(|line| {
-                let mut iter = line.split_whitespace();
-
-                let mut encoded = iter
-                    .nth(2)
-                    .expect("encoded value")
-                    .chars()
-                    .skip(2)
-                    .take(6)
-                    .map(|c| c.to_digit(16).expect("valid hex digit"));
-
-                let distance = (0u32..5)
-                    .rev()
-                    .map(|i| encoded.next().expect("distance digit") * 16u32.pow(i))
-                    .sum::<u32>();
-                let direction = Direction::try_from(encoded.next().expect("direction digit"))
-                    .expect("valid direction");
-
-                (direction, distance)
-            })
+        let mut corners = corners
             .scan((0isize, 0isize), |(x, y), (direction, distance)| {
                 let (dx, dy) = direction.into();
 
@@ -291,22 +136,12 @@ pub fn part_two(input: &str) -> Option<u128> {
             // Update count with the currently active cells
             count += current_count;
             last_y += 1;
-
-            // active
-            //     .iter()
-            //     .for_each(|&x| print!("{}", if x { "#" } else { "." }));
-            // println!("");
         }
 
         // Activate indexes as required
         for x in add {
             active[x] = true;
         }
-
-        // active
-        //     .iter()
-        //     .for_each(|&x| print!("{}", if x { "#" } else { "." }));
-        // println!("");
 
         last_y += 1;
         count += active.iter().filter(|&&active| active).count() as u128;
@@ -316,7 +151,46 @@ pub fn part_two(input: &str) -> Option<u128> {
         }
     }
 
-    Some(count)
+    count
+}
+
+pub fn part_one(input: &str) -> Option<u128> {
+    Some(solve(input.lines().map(|line| {
+        let mut iter = line.split_whitespace();
+
+        let direction =
+            Direction::try_from(iter.next().expect("direction").chars().next().unwrap()).unwrap();
+        let distance = iter
+            .next()
+            .expect("distance")
+            .parse::<u128>()
+            .expect("valid distance");
+
+        (direction, distance)
+    })))
+}
+
+pub fn part_two(input: &str) -> Option<u128> {
+    Some(solve(input.lines().map(|line| {
+        let mut iter = line.split_whitespace();
+
+        let mut encoded = iter
+            .nth(2)
+            .expect("encoded value")
+            .chars()
+            .skip(2)
+            .take(6)
+            .map(|c| c.to_digit(16).expect("valid hex digit"));
+
+        let distance = (0..5)
+            .rev()
+            .map(|i| encoded.next().expect("distance digit") as u128 * 16u128.pow(i))
+            .sum::<u128>();
+        let direction =
+            Direction::try_from(encoded.next().expect("direction digit")).expect("valid direction");
+
+        (direction, distance)
+    })))
 }
 
 #[cfg(test)]
