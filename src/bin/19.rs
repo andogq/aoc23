@@ -107,7 +107,7 @@ pub fn part_one(input: &str) -> Option<u32> {
         parts
             .lines()
             .map(|part| {
-                let (x, m, a, s) = part[1..part.len() - 1]
+                let categories = part[1..part.len() - 1]
                     .split(",")
                     .map(|category| {
                         let mut category = category.chars();
@@ -121,42 +121,13 @@ pub fn part_one(input: &str) -> Option<u32> {
                                 .fold(0, |n, d| (n * 10) + d),
                         )
                     })
-                    .fold(
-                        (None, None, None, None),
-                        |(maybe_x, maybe_m, maybe_a, maybe_s), (category, value)| {
-                            (
-                                if matches!(category, Category::X) {
-                                    Some(value)
-                                } else {
-                                    maybe_x
-                                },
-                                if matches!(category, Category::M) {
-                                    Some(value)
-                                } else {
-                                    maybe_m
-                                },
-                                if matches!(category, Category::A) {
-                                    Some(value)
-                                } else {
-                                    maybe_a
-                                },
-                                if matches!(category, Category::S) {
-                                    Some(value)
-                                } else {
-                                    maybe_s
-                                },
-                            )
-                        },
-                    );
+                    .fold([None; 4], |mut categories, (category, value)| {
+                        categories[category as usize] = Some(value);
 
-                let mut part = [0; 4];
+                        categories
+                    });
 
-                part[Category::X as usize] = x.expect("part to have x value");
-                part[Category::M as usize] = m.expect("part to have m value");
-                part[Category::A as usize] = a.expect("part to have a value");
-                part[Category::S as usize] = s.expect("part to have s value");
-
-                part
+                std::array::from_fn(|i| categories[i].unwrap()) as [u32; 4]
             })
             .filter(|part| {
                 let mut next_workflow = &Workflow::Custom("in".to_string());
@@ -226,23 +197,21 @@ pub fn part_two(input: &str) -> Option<u128> {
                     (workflow, {
                         let mut new_bounds = cursor.bounds.clone();
 
+                        let i = *category as usize;
+
                         // Restrict bounds
                         match comparision {
                             Ordering::Less => {
                                 // Restrict max
-                                new_bounds[*category as usize].1 =
-                                    new_bounds[*category as usize].1.min(*threshold - 1);
+                                new_bounds[i].1 = new_bounds[i].1.min(*threshold - 1);
 
-                                cursor.bounds[*category as usize].0 =
-                                    new_bounds[*category as usize].1 + 1;
+                                cursor.bounds[i].0 = new_bounds[i].1 + 1;
                             }
                             Ordering::Greater => {
                                 // Restrict min
-                                new_bounds[*category as usize].0 =
-                                    new_bounds[*category as usize].0.max(*threshold + 1);
+                                new_bounds[i].0 = new_bounds[i].0.max(*threshold + 1);
 
-                                cursor.bounds[*category as usize].1 =
-                                    new_bounds[*category as usize].0 - 1;
+                                cursor.bounds[i].1 = new_bounds[i].0 - 1;
                             }
                             Ordering::Equal => {
                                 unreachable!("equals comparision shouldn't be present")
